@@ -22,23 +22,15 @@ public:
   enum class Trait { ORG_ID };
 
 private:
-  size_t id;
-  size_t surface_id;
-  hardware_t brain;
-
-  emp::Angle facing;
-
-  double energy;
-  double time_born;
-  double time_dead;
-
-  /// Values calculated from the above:
-  double base_cost;   /// How much energy is spent each update?
-
+  size_t id;            ///< Organism personal ID
+  size_t surface_id;    ///< Organism surface ID
+  hardware_t brain;     ///< Underlying represet
+  emp::Angle facing;    ///< Direction the organism if facing!
+  double energy;        ///< Amount of energy the organims has
+  double base_cost;     ///< Cost per instruction execution!
 public:
   BeakerOrg(inst_lib_t & inst_lib, event_lib_t & event_lib, emp::Ptr<emp::Random> random_ptr)
-    : id(0), brain(inst_lib, event_lib, random_ptr)
-    , facing(), energy(0.0), time_born(0.0), time_dead(-1.0), base_cost(0.01)
+    : id(0), brain(inst_lib, event_lib, random_ptr), facing(), energy(100.0), base_cost(1.00)
   {
     brain.SetMinBindThresh(HW_MIN_SIM_THRESH);
     brain.SetMaxCores(HW_MAX_THREADS);
@@ -57,21 +49,25 @@ public:
   const hardware_t & GetBrain() const { return brain; }
   emp::Angle GetFacing() const { return facing; }
   double GetEnergy() const { return energy; }
-  double GetTimeBorn() const { return time_born; }
-  double GetTimeDead() const { return time_dead; }
   double GetBaseCost() const { return base_cost; }
 
+  ///< Set the ID of the organism!
   BeakerOrg & SetID(size_t _in) { id = _in; return *this; }
+  ///< Set the Surface ID 
   BeakerOrg & SetSurfaceID(size_t _in) { surface_id = _in; return *this; }
-  // BeakerOrg & SetBrain(const hardware_t & _in) { brain = _in; return *this; }
+  ///< Set the direction the organims is facing!
   BeakerOrg & SetFacing(emp::Angle _in) { facing = _in; return *this; }
+  ///< Set the energy variable!
   BeakerOrg & SetEnergy(double _in) { energy = _in; return *this; }
-  BeakerOrg & SetTimeBorn(double _in) { time_born = _in; return *this; }
-  BeakerOrg & SetTimeDead(double _in) { time_dead = _in; return *this; }
+  ///< Set how much each instruction execution costs!
   BeakerOrg & SetBaseCost(double _in) { base_cost = _in; return *this; }
-
+  ///< Old adjust energy!
   BeakerOrg & AdjustEnergy(double _in) { energy += _in; return *this; }
-
+  ///< Add Energy to the organism and return this organism!
+  BeakerOrg & AddEnergy(double _in) { energy += _in; return *this;}
+  ///< Subtract Energy to the organism and return this organism!
+  BeakerOrg & SubEnergy(double _in) { energy -= _in; return *this;}
+  ///< Rotate the direction that organism is facing!
   BeakerOrg & RotateDegrees(double degrees) { facing.RotateDegrees(degrees); return *this; }
 
   void Setup(emp::WorldPosition pos, emp::Random & random) {

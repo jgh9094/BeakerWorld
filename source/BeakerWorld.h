@@ -32,6 +32,7 @@ private:
   event_lib_t event_lib;
   surface_t surface;
   size_t next_id;
+  size_t death_cnt = 0;
 
   mutator_t signalgp_mutator;
 
@@ -57,12 +58,13 @@ public:
       org.SetSurfaceID(surface_id);
     });
     // Make sure that we are tracking organisms by their IDs once placed.
-    OnPlacement( [this](size_t pos){ 
+    OnPlacement( [this](size_t pos){
       size_t id = next_id++;
       GetOrg(pos).GetBrain().SetTrait((size_t)BeakerOrg::Trait::ORG_ID, id);
       id_map[id] = &GetOrg(pos);
     } );
-    OnOrgDeath( [this](size_t pos) {
+    OnOrgDeath( [this](size_t pos) 
+    {
       surface.RemoveBody(GetOrg(pos).GetSurfaceID());
       id_map.erase(GetOrg(pos).GetID());
     });
@@ -173,12 +175,14 @@ public:
     }, 1, "Rotate 5 degrees.");
 
     // On each update, run organisms and make sure they stay on the surface.
-    OnUpdate([this](size_t){
+    OnUpdate([this](size_t)
+    {
       // Process all organisms.
       Process(5);
 
       // Update each organism.
-      for (size_t pos = 0; pos < pop.size(); pos++) {
+      for (size_t pos = 0; pos < pop.size(); pos++) 
+      {
         if (pop[pos].IsNull()) continue;
         auto & org = *pop[pos];
         const size_t surface_id = org.GetSurfaceID();
@@ -189,12 +193,20 @@ public:
         // If an organism has enough energy to reproduce, do so.
         const size_t radius = surface.GetRadius(surface_id);
         const size_t mass = radius * radius;
-        if (org.GetEnergy() > mass) {
+        if (org.GetEnergy() > mass) 
+        {
           // Remove energy for building offspring; cut rest in half, so it is effectively
           // split between parent and child when copied into child.
           org.SetEnergy((org.GetEnergy() - mass / 2.0));
           DoBirth(org, pos);
           // emp::Alert("Birth!");
+        }
+
+        if (org.GetEnergy() >= 10)
+        {
+          death_cnt++;
+          RemoveOrgAt(pos);
+          std::cerr << "Org Died! " << std::endl;
         }
       }
     });
@@ -234,6 +246,8 @@ public:
   {    
     return true;
   }
+
+  double GetDeaths() const {return death_cnt;}
 };
 
 #endif
