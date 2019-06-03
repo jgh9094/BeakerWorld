@@ -30,7 +30,7 @@ private:
   double base_cost;     ///< Cost per instruction execution!
 public:
   BeakerOrg(inst_lib_t & inst_lib, event_lib_t & event_lib, emp::Ptr<emp::Random> random_ptr)
-    : id(0), brain(inst_lib, event_lib, random_ptr), facing(), energy(100.0), base_cost(1.00)
+    : id(0), brain(inst_lib, event_lib, random_ptr), facing(), energy(100.0), base_cost(1.0)
   {
     brain.SetMinBindThresh(HW_MIN_SIM_THRESH);
     brain.SetMaxCores(HW_MAX_THREADS);

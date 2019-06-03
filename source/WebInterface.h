@@ -65,7 +65,7 @@ class WebInterface : public UI::Animate
             << UI::Live(
                 [this]()
                 {
-                    return world.GetDeaths();
+                    return (size_t) world.GetDeaths();
                 }
             )
             << "<br>";
