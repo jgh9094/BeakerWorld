@@ -14,6 +14,9 @@
 
 class BeakerWorld : public emp::World<BeakerOrg> {
 private:
+
+  /* Renaming type names of the world, organims, and web interface.*/
+
   static constexpr size_t TAG_WIDTH = 16;
   using hardware_t = BeakerOrg::hardware_t;
   using program_t = hardware_t::Program;
@@ -23,53 +26,73 @@ private:
   using inst_t = hardware_t::inst_t;
   using inst_lib_t = hardware_t::inst_lib_t;
   using hw_state_t = hardware_t::State;
- 
   using surface_t = emp::Surface<BeakerOrg, BeakerResource>;
   using mutator_t = emp::SignalGPMutator<TAG_WIDTH>;
 
-  BeakerWorldConfig & config;
-  inst_lib_t inst_lib;
-  event_lib_t event_lib;
-  surface_t surface;
-  size_t next_id;
-  size_t death_cnt = 0;
+  /* Configuration specific variables */
 
-  mutator_t signalgp_mutator;
-  std::unordered_map<size_t, emp::Ptr<BeakerOrg>> id_map;
+  BeakerWorldConfig & config;                               ///< Variable that holds all experiment configurations
+  std::unordered_map<size_t, emp::Ptr<BeakerOrg>> id_map;   ///< Variable that holds all surface and org world ids
+  emp::vector<BeakerResource> resources;                    ///< Variable that holds all surface resources
+  size_t next_id;                                           ///< Variable that holds the id placement for id_map
+  size_t hm_size;                                           ///< Variable that holds the size of the heat map
 
-  emp::vector<BeakerResource> resources;
+
+  /* Hardware variables */
+
+  inst_lib_t inst_lib;          ///< Variable that holds instruction library
+  event_lib_t event_lib;        ///< Variable that holds event library
+  mutator_t signalgp_mutator;   ///< Variable mutates organism genoms
+
+  /* Web Interface variables */
+
+  surface_t surface;                    ///< Variable that holds the surface organisms are on
+
+  /* Statistics variables */
+  
+  size_t death_cnt = 0;       ///< Variable that holds number of deaths
 
 public:  
   BeakerWorld(BeakerWorldConfig & _config)
-    : config(_config), inst_lib(), event_lib(),
+    : config(_config), id_map(), next_id(1), 
+      inst_lib(), event_lib(), signalgp_mutator(),
       surface({config.WORLD_X(), config.WORLD_Y()}),
-      next_id(1), signalgp_mutator(), id_map()
+      hm_size(config.HM_SIZE())
   {
+    random_ptr = emp::NewPtr<emp::Random>(config.SEED());
     Config_All();
   }
-  ~BeakerWorld() { id_map.clear(); }
+
+  ~BeakerWorld() { id_map.clear(); random_ptr.Delete();}
 
   surface_t & GetSurface() { return surface; }
 
-  /// React to two bodies having collided.
-  bool PairCollision(BeakerOrg & body1, BeakerOrg & body2) 
+
+  /* Functions dedicated to the initilization of the run! */
+
+  void Config_All();
+  void Config_World();           ///< Function dedicated to configuring the world
+  void Config_Mut();             ///< Function dedicated to configuring the mutation operator
+  void Config_Inst();            ///< Function dedicated to configuring the instructions and instrucion library
+  void Config_Surf();            ///< Function dedicated to configuring the surface
+  void Config_OnUp();            ///< Function dedicated to configuring the OnUpdate function
+  void Initial_Inject();         ///< Function dedicated to injection the initial population or organisms and resources
+  size_t Calc_Heat(double r);    ///< Function dedicated to finding what heat an organism should get
+
+  /* Functions dedicated to keeping track of statistics! */
+
+  double GetDeaths() const {return death_cnt;}  ///< Function dedicated to keeping track of world deaths
+
+  /* Functions dedicated to the physics of the system */
+
+  bool PairCollision(BeakerOrg & body1, BeakerOrg & body2) ///< Function dedicated to dealing with organims collisions [TODO]
   {    
     return true;
   }
 
-  double GetDeaths() const {return death_cnt;}
-
-  /* Functions dedicated to the initilization of the run */
-
-  void Config_All();
-  void Config_World();    ///< Function dedicated to configuring the world
-  void Config_Mut();      ///< Function dedicated to configuring the mutation operator
-  void Config_HM();       ///< Function dedicated to configuring the heat map
-  void Config_Inst();     ///< Function dedicated to configuring the instructions and instrucion library
-  void Config_Surf();     ///< Function dedicated to configuring the surface
-  void Config_OnUp();     ///< Function dedicated to configuring the OnUpdate function
-  void Initial_Inject();  ///< Function dedicated to injection the initial population or organisms and resources
-
+  /* Functions dedicated to setting variables */
+  
+  void SetHM(size_t h) {hm_size = h;}
 };
 
 /* Functions dedicated to the initilization of the run */
@@ -139,11 +162,6 @@ void BeakerWorld::Config_Mut() ///< Function dedicated to configuring the mutati
     surface.ScaleRadius(org.GetSurfaceID(), radius_change);
     return 1;
   });
-}
-
-void BeakerWorld::Config_HM() ///< Function dedicated to configuring the heat map
-{
-
 }
 
 void BeakerWorld::Config_Inst() ///< Function dedicated to configuring instructions and instrucion library
@@ -294,7 +312,8 @@ void BeakerWorld::Initial_Inject() ///< Function dedicated to injection the init
     double x = random_ptr->GetDouble(config.WORLD_X());
     double y = random_ptr->GetDouble(config.WORLD_Y());
     BeakerOrg & org = GetOrg(i);
-    size_t surface_id = surface.AddBody(&org, {x,y}, 8.0, 100);
+    double rad = random_ptr->GetDouble(config.PROGRAM_MIN_RAD_VAL(), config.PROGRAM_MAX_RAD_VAL());
+    size_t surface_id = surface.AddBody(&org, {x,y}, rad, Calc_Heat(rad));
     org.SetSurfaceID(surface_id);
     org.GetBrain().SetProgram(emp::GenRandSignalGPProgram(*random_ptr, inst_lib, config.PROGRAM_MIN_FUN_CNT(),\
       config.PROGRAM_MAX_FUN_CNT(), config.PROGRAM_MIN_FUN_LEN(), config.PROGRAM_MAX_FUN_LEN(), \
@@ -306,8 +325,28 @@ void BeakerWorld::Initial_Inject() ///< Function dedicated to injection the init
   {
     double x = random_ptr->GetDouble(config.WORLD_X());
     double y = random_ptr->GetDouble(config.WORLD_Y());
-    res.surface_id = surface.AddBody(&res, {x,y}, 3.0, 200);
+    res.surface_id = surface.AddBody(&res, {x,y}, 3.0, config.HM_SIZE());
   }
 }
 
+size_t BeakerWorld::Calc_Heat(double r) ///< Function dedicated to injection the initial population or organisms and resources
+{
+  double diff = config.PROGRAM_MAX_RAD_VAL() - config.PROGRAM_MIN_RAD_VAL();
+  diff = diff / (double) hm_size;
+  size_t pos = 0;
+  double curr = config.PROGRAM_MIN_RAD_VAL();
+
+  while(curr <= config.PROGRAM_MAX_RAD_VAL())
+  {
+    if(curr <= r && r <= (curr + diff))
+    {
+      return pos;
+    }
+
+    pos++;
+    curr += diff;
+  }
+
+  return hm_size - 1;
+}
 #endif

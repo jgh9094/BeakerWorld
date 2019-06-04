@@ -18,17 +18,20 @@ namespace UI = emp::web;
 
 class WebInterface : public UI::Animate
 {
-    BeakerWorldConfig config;         ///< Configurations we are uploading.
-    UI::Document control_viewer;      ///< Object in charge of the controls.
-    UI::Document beaker_viewer;       ///< Object in charge of beaker view.
-    UI::Document stats_viewer;        ///< Object in charge of stats view.
-    BeakerWorld world;                ///< Object in charge of managing the world.
+    BeakerWorldConfig config;               ///< Configurations we are uploading.
+    UI::Document control_viewer;            ///< Object in charge of the controls.
+    UI::Document beaker_viewer;             ///< Object in charge of beaker view.
+    UI::Document stats_viewer;              ///< Object in charge of stats view.
+    BeakerWorld world;                      ///< Object in charge of managing the world.
+    emp::vector<std::string> heat_map;      ///< Variable that holds the heat map colors
 
-    public:
+    public:     
 
         WebInterface(): control_viewer("emp_controls"), beaker_viewer("emp_beaker"),
-                        stats_viewer("emp_stats") ,world(config)
+                        stats_viewer("emp_stats"), world(config)
         {
+            Config_HM();
+
             // Adding the start/stop button!
             control_viewer << UI::Button(
                 [this]()
@@ -71,7 +74,7 @@ class WebInterface : public UI::Animate
             << "<br>";
             // Adding the canvas to draw organsisms!
             beaker_viewer << UI::Canvas(config.WORLD_X(), config.WORLD_Y(), "beaker_view");
-            UI::Draw(beaker_viewer.Canvas("beaker_view"), world.GetSurface(), emp::GetHueMap(360));
+            UI::Draw(beaker_viewer.Canvas("beaker_view"), world.GetSurface(), heat_map);
         }
 
         void Redraw();  ///< Function dedicated to redrawing objects on screen
@@ -79,6 +82,8 @@ class WebInterface : public UI::Animate
         void DoStep();  ///< Function responsible for step buttion actions [TODO]
         void DoReset(); ///< Function responsible for reset button actions
         void DoFrame(); ///< Function responsible for drawing a frame *overloaded*
+
+        void Config_HM();              ///< Function dedicated to configuring the heat map
 };
 
 void WebInterface::Redraw() ///< Function dedicated to redrawing objects on screen
@@ -123,9 +128,28 @@ void WebInterface::DoFrame() ///< Function responsible for drawing a frame *over
     if(GetActive())
     {
         world.Update();
-        UI::Draw(beaker_viewer.Canvas("beaker_view"), world.GetSurface(), emp::GetHueMap(360));
-
+        UI::Draw(beaker_viewer.Canvas("beaker_view"), world.GetSurface(), heat_map);
         WebInterface::Redraw();
     }
 }
+
+void WebInterface::Config_HM() ///< Function dedicated to configuring the heat map
+{
+  // Level 0 heat: Blue
+  heat_map.push_back(emp::ColorRGB(0,0,225));
+  // Level 1 heat: Cyan
+  heat_map.push_back(emp::ColorRGB(0,255,255));
+  // Level 2 heat: Green Yellow
+  heat_map.push_back(emp::ColorRGB(173, 255, 47));
+  // Level 3 heat: Yellow
+  heat_map.push_back(emp::ColorRGB(255, 255, 0));
+  // Level 4 heat: Red
+  heat_map.push_back(emp::ColorRGB(255, 0, 0));
+  // Level 5 heat: White
+  heat_map.push_back(emp::ColorRGB(245, 245, 255));
+  // Level 6 (resource only: magenta
+  heat_map.push_back(emp::ColorRGB(255, 0, 255));
+}
+
+
 #endif
