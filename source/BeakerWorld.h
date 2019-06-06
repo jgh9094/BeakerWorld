@@ -51,13 +51,18 @@ private:
   /* Statistics variables */
   
   size_t death_cnt = 0;       ///< Variable that holds number of deaths
+  size_t blue_cnt = 0;        ///< Variables that holds number of colors
+  size_t cyan_cnt = 0;
+  size_t lime_cnt = 0;
+  size_t yellow_cnt = 0;
+  size_t red_cnt = 0;
+  size_t white_cnt = 0;
 
 public:  
   BeakerWorld(BeakerWorldConfig & _config)
     : config(_config), id_map(), next_id(1), 
-      inst_lib(), event_lib(), signalgp_mutator(),
-      surface({config.WORLD_X(), config.WORLD_Y()}),
-      hm_size(config.HM_SIZE())
+      hm_size(config.HM_SIZE()), inst_lib(), event_lib(), 
+      signalgp_mutator(), surface({config.WORLD_X(), config.WORLD_Y()})
   {
     random_ptr = emp::NewPtr<emp::Random>(config.SEED());
     Config_All();
@@ -79,9 +84,17 @@ public:
   void Initial_Inject();         ///< Function dedicated to injection the initial population or organisms and resources
   size_t Calc_Heat(double r);    ///< Function dedicated to finding what heat an organism should get
 
-  /* Functions dedicated to keeping track of statistics! */
+  /* Functions dedicated to returning statistics! */
 
   double GetDeaths() const {return death_cnt;}  ///< Function dedicated to keeping track of world deaths
+  int GetBlue() const {return blue_cnt;}     ///< Functions dedicated to returning population distributions
+  int GetCyan() const {return cyan_cnt;}
+  int GetLime() const {return lime_cnt;}
+  int GetYellow() const {return yellow_cnt;}
+  int GetRed() const {return red_cnt;}
+  int GetWhite() const {return white_cnt;}
+
+
 
   /* Functions dedicated to the physics of the system */
 
@@ -116,7 +129,7 @@ void BeakerWorld::Config_World() ///< Function dedicated to configuring the worl
   {
     emp::Point parent_center = surface.GetCenter(GetOrg(parent_pos).GetSurfaceID());
     double parent_radius = surface.GetRadius(GetOrg(parent_pos).GetSurfaceID());
-    size_t surface_id = surface.AddBody(&org, parent_center, parent_radius, 100);
+    size_t surface_id = surface.AddBody(&org, parent_center, parent_radius, Calc_Heat(parent_radius));
     org.SetSurfaceID(surface_id);
   });
   // Make sure that we are tracking organisms by their IDs once placed.
@@ -290,13 +303,12 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
         // split between parent and child when copied into child.
         org.SetEnergy((org.GetEnergy() - mass / 2.0));
         DoBirth(org, pos);
-        // emp::Alert("Birth!");
       }
 
-      if (org.GetEnergy() <= 0.0)
+      if (org.GetEnergy() <= 50.0)
       {
         death_cnt++;
-        RemoveOrgAt(pos);
+        DoDeath(pos);
         std::cerr << "Org Died! " << std::endl;
       }
     }

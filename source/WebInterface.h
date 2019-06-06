@@ -22,6 +22,7 @@ class WebInterface : public UI::Animate
     UI::Document control_viewer;            ///< Object in charge of the controls.
     UI::Document beaker_viewer;             ///< Object in charge of beaker view.
     UI::Document stats_viewer;              ///< Object in charge of stats view.
+    // UI::Document hist_viewer;               ///< Object in charge of histogram view.
     BeakerWorld world;                      ///< Object in charge of managing the world.
     emp::vector<std::string> heat_map;      ///< Variable that holds the heat map colors
 
@@ -38,18 +39,25 @@ class WebInterface : public UI::Animate
                 {
                     this->DoStart();
                 }, "Start", "start_btn")
-                << " Press to start/stop simulation!" 
-                << "<br style='line-height: 30px' />";
-
-            // Adding the restart button!
-            control_viewer << UI::Button(
+                << UI::Button(
                 [this]()
                 {
                     this->DoReset();
                 }, "Reset", "reset_btn")
-                << " Press to reset the simulation to the beginning!" 
-                << "<br>";
-            stats_viewer << "World Statistics: "
+                << " Press to start/stop simulation!" 
+                << "<br style='line-height: 30px' />";
+
+            // // Adding the restart button!
+            // control_viewer << UI::Button(
+            //     [this]()
+            //     {
+            //         this->DoReset();
+            //     }, "Reset", "reset_btn")
+            //     << " Press to reset the simulation to the beginning!" 
+            //     << "<br>";
+
+            // Add the viewing of the world statistics!
+            stats_viewer << "<u>World Statistics</u>:"
             << "<br>" 
             << "Update @: " << UI::Live(
                 [this]()
@@ -61,7 +69,7 @@ class WebInterface : public UI::Animate
             << UI::Live(
                 [this]()
                 {
-                    return world.GetSize();
+                    return world.GetNumOrgs();
                 }
             )
             << " | # of Deaths: "
@@ -77,19 +85,28 @@ class WebInterface : public UI::Animate
             UI::Draw(beaker_viewer.Canvas("beaker_view"), world.GetSurface(), heat_map);
         }
 
-        void Redraw();  ///< Function dedicated to redrawing objects on screen
-        void DoStart(); ///< Function responsible for start button actions
-        void DoStep();  ///< Function responsible for step buttion actions [TODO]
-        void DoReset(); ///< Function responsible for reset button actions
-        void DoFrame(); ///< Function responsible for drawing a frame *overloaded*
+        /* Web/UI Functions*/
 
-        void Config_HM();              ///< Function dedicated to configuring the heat map
+        void Redraw();                  ///< Function dedicated to redrawing objects on screen
+        void DoStart();                 ///< Function responsible for start button actions
+        void DoStep();                  ///< Function responsible for step buttion actions [TODO]
+        void DoReset();                 ///< Function responsible for reset button actions
+        void DoFrame();                 ///< Function responsible for drawing a frame *overloaded*
+        void Config_HM();               ///< Function dedicated to configuring the heat map
+
+        /* Getter Functions*/
+        int GetBlue() const {return world.GetBlue();}     ///< Functions dedicated to returning population distributions
+        int GetCyan() const {return world.GetCyan();}
+        int GetLime() const {return world.GetLime();}
+        int GetYellow() const {return world.GetYellow();}
+        int GetRed() const {return world.GetRed();}
+        int GetWhite() const {return world.GetWhite();}
 };
 
 void WebInterface::Redraw() ///< Function dedicated to redrawing objects on screen
 {
     stats_viewer.Redraw();
-    
+    // hist_viewer.Redraw();
 }
 
 void WebInterface::DoStart() ///< Function responsible for start button actions

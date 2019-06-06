@@ -28,6 +28,8 @@ private:
   emp::Angle facing;    ///< Direction the organism if facing!
   double energy;        ///< Amount of energy the organims has
   double base_cost;     ///< Cost per instruction execution!
+  // double heat_pos;      ///< Heat group that the organism is a part of
+
 public:
   BeakerOrg(inst_lib_t & inst_lib, event_lib_t & event_lib, emp::Ptr<emp::Random> random_ptr)
     : id(0), brain(inst_lib, event_lib, random_ptr), facing(), energy(100.0), base_cost(1.0)
