@@ -9,6 +9,7 @@
 #include "web/Button.h"
 #include "web/web.h"
 #include "web/Canvas.h"
+#include "web/JSWrap.h"
 
 // Experiment includes
 #include "BeakerWorld.h"
@@ -72,17 +73,42 @@ class WebInterface : public UI::Animate
                     return world.GetNumOrgs();
                 }
             )
+            << " | Resource Size: "
+            << UI::Live(
+                [this]()
+                {
+                    return world.GetResSize();
+                }
+            )
+            << " | id_map Size: "
+            << UI::Live(
+                [this]()
+                {
+                    return world.GetIDSize();
+                }
+            )
             << " | # of Deaths: "
             << UI::Live(
                 [this]()
                 {
-                    return (size_t) world.GetDeaths();
+                    return world.GetStv() + world.GetEat() + world.GetPop();
                 }
             )
             << "<br>";
+
             // Adding the canvas to draw organsisms!
             beaker_viewer << UI::Canvas(config.WORLD_X(), config.WORLD_Y(), "beaker_view");
             UI::Draw(beaker_viewer.Canvas("beaker_view"), world.GetSurface(), heat_map);
+
+            emp::JSWrap([this](){return world.GetBlue();}, "GetBlue", false);
+            emp::JSWrap([this](){return world.GetCyan();}, "GetCyan", false);
+            emp::JSWrap([this](){return world.GetLime();}, "GetLime", false);
+            emp::JSWrap([this](){return world.GetYellow();}, "GetYellow", false);
+            emp::JSWrap([this](){return world.GetRed();}, "GetRed", false);
+            emp::JSWrap([this](){return world.GetWhite();}, "GetWhite", false);
+            emp::JSWrap([this](){return world.GetStv();}, "GetStv", false);
+            emp::JSWrap([this](){return world.GetEat();}, "GetEat", false);
+            emp::JSWrap([this](){return world.GetPop();}, "GetPop", false);
         }
 
         /* Web/UI Functions*/
@@ -93,20 +119,13 @@ class WebInterface : public UI::Animate
         void DoReset();                 ///< Function responsible for reset button actions
         void DoFrame();                 ///< Function responsible for drawing a frame *overloaded*
         void Config_HM();               ///< Function dedicated to configuring the heat map
-
-        /* Getter Functions*/
-        int GetBlue() const {return world.GetBlue();}     ///< Functions dedicated to returning population distributions
-        int GetCyan() const {return world.GetCyan();}
-        int GetLime() const {return world.GetLime();}
-        int GetYellow() const {return world.GetYellow();}
-        int GetRed() const {return world.GetRed();}
-        int GetWhite() const {return world.GetWhite();}
+        void RedrawChart();
 };
 
 void WebInterface::Redraw() ///< Function dedicated to redrawing objects on screen
 {
     stats_viewer.Redraw();
-    // hist_viewer.Redraw();
+    RedrawChart();
 }
 
 void WebInterface::DoStart() ///< Function responsible for start button actions
@@ -157,16 +176,82 @@ void WebInterface::Config_HM() ///< Function dedicated to configuring the heat m
   // Level 1 heat: Cyan
   heat_map.push_back(emp::ColorRGB(0,255,255));
   // Level 2 heat: Green Yellow
-  heat_map.push_back(emp::ColorRGB(173, 255, 47));
+  heat_map.push_back(emp::ColorRGB(173,255,47));
   // Level 3 heat: Yellow
-  heat_map.push_back(emp::ColorRGB(255, 255, 0));
+  heat_map.push_back(emp::ColorRGB(255,255,0));
   // Level 4 heat: Red
-  heat_map.push_back(emp::ColorRGB(255, 0, 0));
+  heat_map.push_back(emp::ColorRGB(255,0,0));
   // Level 5 heat: White
-  heat_map.push_back(emp::ColorRGB(245, 245, 255));
+  heat_map.push_back(emp::ColorRGB(245,245,255));
   // Level 6 (resource only: magenta
-  heat_map.push_back(emp::ColorRGB(255, 0, 255));
+  heat_map.push_back(emp::ColorRGB(255,0,255));
 }
 
+void WebInterface::RedrawChart()
+{
+    EM_ASM({
+            var data = [];
+            var data1 = [];
+            var ultimateColors = [];
+            ultimateColors.push('rgb(0,0,225)');
+            ultimateColors.push('rgb(0,255,255)');
+            ultimateColors.push('rgb(173,255,47)');
+            ultimateColors.push('rgb(255,255,0)');
+            ultimateColors.push('rgb(255,0,0)');
+            ultimateColors.push('rgb(245,245,255)');
+            marker = {colors: ultimateColors};
+
+            data.push
+            ({ values: [emp.GetBlue(), emp.GetCyan(), emp.GetLime(), emp.GetYellow(), emp.GetRed(), emp.GetWhite()],
+                labels: ['Blue', 'Cyan', 'Lime', 'Yellow', 'Red', 'White'],
+                domain: {row: 0},
+                name: 'Popluation',
+                marker,
+                hoverinfo: 'label+percent+name+value',
+                hole: .4,
+                type: 'pie'
+            });
+            data.push
+            ({
+                values: [emp.GetStv(), emp.GetEat(), emp.GetPop()],
+                labels: ['Starving', 'Eaten', 'Apoptosis'],
+                text: 'CO2',
+                textposition: 'inside',
+                domain: {row: 1},
+                name: 'Death',
+                hoverinfo: 'label+percent+name+value',
+                hole: .4,
+                type: 'pie'
+            });
+
+            ann = [];
+
+            ann.push({font: {size: 16},
+                      showarrow: false,
+                      text: 'Population Distribution',
+                      y: 1.06
+                      });
+
+            ann.push({font: {size: 16},
+                      showarrow: false,
+                      text: 'Death Distribution'
+                      });
+
+            var layout = {annotations: ann};
+            layout['height'] = 400;
+            layout['width'] = 300;
+            layout['showlegend'] = false;
+            layout['grid'] = {};
+            layout['grid']['rows'] = 2;
+            layout['grid']['columns'] = 1;
+            layout['margin'] = {};
+            layout['margin']['l'] = 0;
+            layout['margin']['r'] = 0;
+            layout['margin']['b'] = 0;
+            layout['margin']['t'] = 18;
+
+            Plotly.newPlot('emp_hist1', data, layout);
+        });
+}
 
 #endif
