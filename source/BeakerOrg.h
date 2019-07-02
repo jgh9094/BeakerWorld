@@ -19,7 +19,7 @@ public:
   using inst_lib_t = hardware_t::inst_lib_t;
   using hw_state_t = hardware_t::State;
 
-  enum class Trait { ORG_ID };
+  enum class Trait { MAP_ID, WRL_ID };
 
 private:
   size_t id;            ///< Organism personal ID
@@ -65,7 +65,20 @@ public:
   ///< Old adjust energy!
   BeakerOrg & AdjustEnergy(double _in) { energy += _in; return *this; }
   ///< Add Energy to the organism and return this organism!
-  BeakerOrg & AddEnergy(double _in) { energy += _in; return *this;}
+  BeakerOrg & AddEnergy(double _in) 
+  { 
+    if ((energy + _in) >= 350.0)
+    {
+      energy = 350.0; 
+    }
+
+    if ((energy + _in) < 350.0)
+    {
+      energy += _in;
+    }
+
+    return *this;
+  }
   ///< Subtract Energy to the organism and return this organism!
   BeakerOrg & SubEnergy(double _in) { energy -= _in; return *this;}
   ///< Rotate the direction that organism is facing!
