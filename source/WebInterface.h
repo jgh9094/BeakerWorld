@@ -48,15 +48,6 @@ class WebInterface : public UI::Animate
                 << " Press to start/stop simulation!" 
                 << "<br style='line-height: 30px' />";
 
-            // // Adding the restart button!
-            // control_viewer << UI::Button(
-            //     [this]()
-            //     {
-            //         this->DoReset();
-            //     }, "Reset", "reset_btn")
-            //     << " Press to reset the simulation to the beginning!" 
-            //     << "<br>";
-
             // Add the viewing of the world statistics!
             stats_viewer << "<u>World Statistics</u>:"
             << "<br>" 
@@ -71,13 +62,6 @@ class WebInterface : public UI::Animate
                 [this]()
                 {
                     return world.GetNumOrgs();
-                }
-            )
-            << " | Resource Size: "
-            << UI::Live(
-                [this]()
-                {
-                    return world.GetResSize();
                 }
             )
             << " | id_map Size: "
@@ -125,7 +109,12 @@ class WebInterface : public UI::Animate
 void WebInterface::Redraw() ///< Function dedicated to redrawing objects on screen
 {
     stats_viewer.Redraw();
-    RedrawChart();
+
+    if(world.GetRedraw())
+    {
+        RedrawChart();        
+        world.SetRedraw(false);
+    }
 }
 
 void WebInterface::DoStart() ///< Function responsible for start button actions
