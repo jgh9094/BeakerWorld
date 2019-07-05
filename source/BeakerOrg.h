@@ -22,16 +22,15 @@ public:
   enum class Trait { MAP_ID, WRL_ID };
 
 private:
-  size_t id;            ///< Organism personal ID
-  size_t surface_id;    ///< Organism surface ID
-  hardware_t brain;     ///< Underlying represet
-  emp::Angle facing;    ///< Direction the organism if facing!
-  double energy;        ///< Amount of energy the organims has
-  double base_cost;     ///< Cost per instruction execution!
+  size_t id;                        ///< Organism personal ID
+  size_t surface_id;                ///< Organism surface ID
+  hardware_t brain;                 ///< Underlying represet
+  emp::Angle facing;                ///< Direction the organism if facing!
+  double energy;                    ///< Amount of energy the organims has
 
 public:
   BeakerOrg(inst_lib_t & inst_lib, event_lib_t & event_lib, emp::Ptr<emp::Random> random_ptr)
-    : id(0), brain(inst_lib, event_lib, random_ptr), facing(), energy(100.0), base_cost(1.0)
+    : id(0), brain(inst_lib, event_lib, random_ptr), facing(), energy(1000.0)
   {
     brain.SetMinBindThresh(HW_MIN_SIM_THRESH);
     brain.SetMaxCores(HW_MAX_THREADS);
@@ -50,7 +49,6 @@ public:
   const hardware_t & GetBrain() const { return brain; }
   emp::Angle GetFacing() const { return facing; }
   double GetEnergy() const { return energy; }
-  double GetBaseCost() const { return base_cost; }
 
   ///< Set the ID of the organism!
   BeakerOrg & SetID(size_t _in) { id = _in; return *this; }
@@ -60,36 +58,20 @@ public:
   BeakerOrg & SetFacing(emp::Angle _in) { facing = _in; return *this; }
   ///< Set the energy variable!
   BeakerOrg & SetEnergy(double _in) { energy = _in; return *this; }
-  ///< Set how much each instruction execution costs!
-  BeakerOrg & SetBaseCost(double _in) { base_cost = _in; return *this; }
-  ///< Old adjust energy!
-  BeakerOrg & AdjustEnergy(double _in) { energy += _in; return *this; }
   ///< Add Energy to the organism and return this organism!
-  BeakerOrg & AddEnergy(double _in) 
-  { 
-    if ((energy + _in) >= 350.0)
-    {
-      energy = 350.0; 
-    }
-
-    if ((energy + _in) < 350.0)
-    {
-      energy += _in;
-    }
-
-    return *this;
-  }
+  BeakerOrg & AddEnergy(double _in) { energy += _in; return *this;}
   ///< Subtract Energy to the organism and return this organism!
   BeakerOrg & SubEnergy(double _in) { energy -= _in; return *this;}
   ///< Rotate the direction that organism is facing!
   BeakerOrg & RotateDegrees(double degrees) { facing.RotateDegrees(degrees); return *this; }
 
-  void Setup(emp::WorldPosition pos, emp::Random & random) {
-    // std::cerr << "Seting up at pos " << pos.GetIndex() << std::endl;
+  void Setup(emp::WorldPosition pos, emp::Random & random) 
+  {
     RotateDegrees(random.GetDouble(360.0));
   }
 
-  void Process(size_t exe_count) {
+  void Process(size_t exe_count) 
+  {
     brain.Process(exe_count);
   };
 };

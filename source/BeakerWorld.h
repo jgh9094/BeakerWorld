@@ -34,6 +34,7 @@ private:
   using hw_state_t = hardware_t::State;
   using surface_t = emp::Surface<BeakerOrg, BeakerResource>;
   using mutator_t = emp::SignalGPMutator<TAG_WIDTH>;
+  using memory_t = hardware_t::memory_t;
 
   /* Configuration specific variables */
 
@@ -71,8 +72,10 @@ private:
 
   /* World Holders */
 
-  std::set<size_t> kill_list;      ///< Variable that holds org ids that have been eaten
-  std::set<size_t> birth_list;      ///< Variable that holds org ids that can give birth
+  std::set<size_t> kill_list;              ///< Variable that holds org ids that have been eaten
+  std::set<size_t> birth_list;             ///< Variable that holds org ids that can give birth
+  //>     <res_id, org_id>
+  std::map<size_t, size_t> eaten_list;     ///< Variable that holds resources that have been eaten, along with organims world-id
 
 public:  
   BeakerWorld(BeakerWorldConfig & _config)
@@ -155,25 +158,33 @@ void BeakerWorld::Config_World() ///< Function dedicated to configuring the worl
   // Setup organism to share parent's surface features.
   OnOffspringReady( [this](BeakerOrg & org, size_t parent_pos)
   {
+    // Reset offspring's hardware so no issues arise
+    org.GetBrain().ResetHardware();
+    org.GetBrain().SpawnCore(0, memory_t(), true);
+    org.SetEnergy(config.INIT_ENERGY());
+
+    // Set parent attributes to offspring and possibly mutate radius
     emp::Point parent_center = surface.GetCenter(GetOrg(parent_pos).GetSurfaceID());
     double parent_radius = surface.GetRadius(GetOrg(parent_pos).GetSurfaceID());
     double off_radius = MutRad(parent_radius, org);
-
     size_t heat = Calc_Heat(off_radius);
 
     // Mutate the offspring!
     DoMutationsOrg(org);
 
+    // Add to the surface and set its surface id!
     size_t surface_id = surface.AddBody(&org, parent_center, off_radius, heat);
     org.SetSurfaceID(surface_id);
     org.GetBrain().SetTrait(HEAT, heat);
 
+    // Keep track of organism heat signature.
     Col_Birth(heat);
   });
 
   // Make sure that we are tracking organisms by their IDs once placed.
   OnPlacement( [this](size_t pos)
   {
+    // Set appropiate traits and store in map_id for future access
     size_t id = next_id++;
     GetOrg(pos).GetBrain().SetTrait((size_t)BeakerOrg::Trait::MAP_ID, id);
     GetOrg(pos).GetBrain().SetTrait((size_t)BeakerOrg::Trait::WRL_ID, pos);
@@ -183,6 +194,7 @@ void BeakerWorld::Config_World() ///< Function dedicated to configuring the worl
   // Trigger for an organisms death.
   OnOrgDeath( [this](size_t pos) 
   {
+    // Keep track of org deaths and remove from id_map and surface!
     Col_Death((size_t) GetOrg(pos).GetBrain().GetTrait(HEAT));
     surface.RemoveBody(GetOrg(pos).GetSurfaceID());
     id_map.erase(GetOrg(pos).GetBrain().GetTrait((size_t)BeakerOrg::Trait::MAP_ID));
@@ -287,7 +299,7 @@ void BeakerWorld::Config_Inst() ///< Function dedicated to configuring instructi
 void BeakerWorld::Config_Surf() ///< Function dedicated to configuring the surface
 {
   // Setup surface functions to allow organisms to eat.
-  surface.AddOverlapFun( [this](BeakerOrg & pred, BeakerOrg & prey) 
+  surface.AddOverlapFun([this](BeakerOrg & pred, BeakerOrg & prey) 
   {
     double pred_rd = surface.GetRadius(pred.GetSurfaceID());
     double prey_rd = surface.GetRadius(prey.GetSurfaceID());
@@ -302,31 +314,33 @@ void BeakerWorld::Config_Surf() ///< Function dedicated to configuring the surfa
 
       if(kill_list.find(prey_id) == kill_list.end())
       {
-        pred.AddEnergy(prey.GetEnergy() / 4.0);
+        pred.AddEnergy(prey.GetEnergy() / 2.0);
         kill_list.insert(prey_id);
         death_eat++;
         redraw = true;
       }
     }
   });
-  // 
+  //< Overlap function for organism to eat a resource
   surface.AddOverlapFun( [this](BeakerOrg & org, BeakerResource & res) 
   {
-    org.AddEnergy(1.0);
-    double x = random_ptr->GetDouble(config.WORLD_X());
-    double y = random_ptr->GetDouble(config.WORLD_Y());
-    surface.SetCenter(res.surface_id, {x,y});
+    const size_t org_wid = org.GetBrain().GetTrait((size_t)BeakerOrg::Trait::WRL_ID);
+    const size_t res_mid = res.GetMapID();
+
+    // If the resource has not been eaten yet?
+    if(eaten_list.find(res_mid) == eaten_list.end())
+    {
+      // We store the resource id and the organism world_id that ate it. 
+      eaten_list[res_mid] = org_wid;
+    }
   });
   surface.AddOverlapFun( [](BeakerResource &, BeakerResource &) 
   {
-    ///< Leave empty lol 
+    ///< Leave empty. Resources can't eat other resources lol. 
   });
   surface.AddOverlapFun( [this](BeakerResource & res, BeakerOrg & org) 
   {
-    org.AddEnergy(1.0);
-    double x = random_ptr->GetDouble(config.WORLD_X());
-    double y = random_ptr->GetDouble(config.WORLD_Y());
-    surface.SetCenter(res.surface_id, {x,y});
+    ///< Leave empty lol. Resources shouldn't eat organisms. 
   });
 }
 
@@ -336,19 +350,21 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
   OnUpdate([this](size_t)
   {
     // Process all organisms.
-    Process(5);
+    Process(config.PROCESS_NUM());
 
     // Update each organism.
     for (size_t pos = 0; pos < pop.size(); pos++) 
     {
-      if (pop[pos].IsNull()) continue;
+      // If position contains a NullPtr skippppppp
+      if (pop[pos].IsNull()) {continue;}
+
       auto & org = *pop[pos];
 
-      // Provide additional resources toward reproduction.
-      org.SubEnergy(0.01);
+      // Subtract energy per update call
+      org.SubEnergy(config.ENERGY_REDUCTION());
 
       // If an organism has enough energy to reproduce, store id.
-      if (org.GetEnergy() > 200.0) 
+      if (org.GetEnergy() > config.REPRODUCTION_THRESH()) 
       {
         birth_list.insert(pos);
         redraw = true;
@@ -363,39 +379,61 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
     }
 
     ///< w_id -> world id
-    ///< map_id -> map id in BeakerWorld
+    ///< map_id -> map_id id in BeakerWorld
 
     // Kill all organims that need to be killed 
     for(auto w_id : kill_list)
     {
       DoDeath(w_id);
     }
-    kill_list.clear();
+
+    // Allow organisms to eat
+    for(auto & p : eaten_list)
+    {
+      // If organism was not killed allow to consume resource
+      // and relocate resource randomly. 
+      if(kill_list.find(p.second) == kill_list.end())
+      {
+        auto & org = *pop[p.second];
+        org.AddEnergy(config.RESOURCE_POWERUP());
+        double x = random_ptr->GetDouble(config.WORLD_X());
+        double y = random_ptr->GetDouble(config.WORLD_Y());
+        surface.SetCenter(resources[p.first].GetSurfaceID(), {x,y});
+      }
+    }
+
     // Allow organisms to reproduce
     for(auto w_id : birth_list)
     {
-      // If we have space
-      if(GetNumOrgs() < config.MAX_POP_SIZE())
+      // If world is full skip loop
+      if(GetNumOrgs() == config.MAX_POP_SIZE())
+      {
+        break;
+      }
+      // Else if the org has been killed, cannot reproduce and skip
+      else if(kill_list.find(w_id) != kill_list.end())
+      {
+        continue;
+      }
+      // Else all conditions are met for an org to reproduce
+      else
       {
         size_t map_id = GetOrg(w_id).GetBrain().GetTrait((size_t)BeakerOrg::Trait::MAP_ID);
         // If org id is still active
         if(id_map.find(map_id) != id_map.end())
         {
-          // Split energy for building offspring by half.
+          // Split energy for building offspring by half and spawn new organism.
           emp::Ptr<BeakerOrg> org = id_map[map_id];
-          org->SetEnergy(org->GetEnergy() / 2.0);
-
-          // Spawn new organism
-          std::cerr << "Org NewBorn! " << std::endl;
+          org->SubEnergy(org->GetEnergy() / config.REPRODUCTION_PENALTY());
           DoBirth(GetOrg(w_id), w_id);
         }
       }
-      else
-      {
-        break;
-      }
     }
+
+    // Clear list for next update call
     birth_list.clear();
+    kill_list.clear();
+    eaten_list.clear();
   });
 }
 
@@ -405,38 +443,37 @@ void BeakerWorld::Initial_Inject() ///< Function dedicated to injection the init
   Inject(BeakerOrg(inst_lib, event_lib, random_ptr), config.INIT_POP_SIZE());
   for (size_t i = 0; i < config.INIT_POP_SIZE(); i++) 
   {
+    // Random coordiantes for organism
     double x = random_ptr->GetDouble(config.WORLD_X());
     double y = random_ptr->GetDouble(config.WORLD_Y());
-    BeakerOrg & org = GetOrg(i);
+    
+    // Get random radius and calculate heat color
     double rad = random_ptr->GetDouble(config.PROGRAM_MIN_RAD_VAL(), config.PROGRAM_MAX_RAD_VAL());
     size_t heat = Calc_Heat(rad);
-
-    if(heat < 0)
-    {
-      std::cerr << "Heat < 0 " << std::endl;
-      exit(-1);
-    }
-    if(heat > hm_size)
-    {
-      std::cerr << "Heat > hm_size " << std::endl;
-      exit(-1);
-    }
-
     Col_Birth(heat);
-    size_t surface_id = surface.AddBody(&org, {x,y}, rad, heat);
-    org.SetSurfaceID(surface_id);
+
+    // Get and Set organism
+    BeakerOrg & org = GetOrg(i);
     org.GetBrain().SetProgram(emp::GenRandSignalGPProgram(*random_ptr, inst_lib, config.PROGRAM_MIN_FUN_CNT(),\
       config.PROGRAM_MAX_FUN_CNT(), config.PROGRAM_MIN_FUN_LEN(), config.PROGRAM_MAX_FUN_LEN(), \
       config.PROGRAM_MIN_ARG_VAL(), config.PROGRAM_MAX_ARG_VAL()));
     org.GetBrain().SetTrait(HEAT, heat);
+    org.SetEnergy(config.INIT_ENERGY());
+
+    // Add organism to the surface and store its id
+    size_t surface_id = surface.AddBody(&org, {x,y}, rad, heat);
+    org.SetSurfaceID(surface_id);
   }
   // Add in resources.
   resources.resize(config.NUM_RESOURCE_SOURCES());
-  for (BeakerResource & res : resources) 
+
+  for(size_t i = 0; i < resources.size(); ++i)
   {
+    //Place them randomly throughout the canvas and store their map_id
     double x = random_ptr->GetDouble(config.WORLD_X());
     double y = random_ptr->GetDouble(config.WORLD_Y());
-    res.surface_id = surface.AddBody(&res, {x,y}, 3.0, config.HM_SIZE());
+    resources[i].SetMapID(i);
+    resources[i].SetSurfaceID(surface.AddBody(&resources[i], {x,y}, 3.0, config.HM_SIZE()));
   }
 }
 
@@ -452,13 +489,10 @@ size_t BeakerWorld::Calc_Heat(double r) ///< Function dedicated to injection the
     curr += diff;
     if(r <= curr )
     {
-      // std::cerr << "Bound: " << curr << std::endl;
       return pos;
     }
     pos++;
   }
-
-  // std::cerr << "Bound: " << curr << std::endl;
   return hm_size - 1;
 }
 
@@ -550,7 +584,6 @@ double BeakerWorld::MutRad(double r, BeakerOrg & org)
       {
         new_r = config.PROGRAM_MIN_RAD_VAL();
       }
-      std::cerr << radius << "=RAD_MUT=" << new_r <<  std::endl;
       return new_r;
     }
     return r;
