@@ -67,7 +67,7 @@ public:
 
   void Setup(emp::WorldPosition pos, emp::Random & random) 
   {
-    RotateDegrees(random.GetDouble(360.0));
+    RotateDegrees(random.GetDouble(360.0));     
   }
 
   void Process(size_t exe_count) 
