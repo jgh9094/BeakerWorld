@@ -17,6 +17,7 @@
 ///< Standard C++ includes
 #include <queue> 
 #include <set>
+#include <utility>
 
 class BeakerWorld : public emp::World<BeakerOrg> {
 private:
@@ -35,6 +36,9 @@ private:
   using surface_t = emp::Surface<BeakerOrg, BeakerResource>;
   using mutator_t = emp::SignalGPMutator<TAG_WIDTH>;
   using memory_t = hardware_t::memory_t;
+
+  // type for event pairing
+  using event_t = std::pair<size_t, size_t>;
 
   /* Configuration specific variables */
 
@@ -70,12 +74,14 @@ private:
   int red_cnt = 0;
   int white_cnt = 0;
 
-  /* World Holders */
+  /* World Event Tracker/Queue */
 
-  std::set<size_t> kill_list;              ///< Variable that holds org ids that have been eaten
-  std::set<size_t> birth_list;             ///< Variable that holds org ids that can give birth
-  //>     <res_id, org_id>
-  std::map<size_t, size_t> eaten_list;     ///< Variable that holds resources that have been eaten, along with organims world-id
+  std::set<size_t> kill_list;                     ///< Holds org ids that have been eaten. <org_wid>
+  std::set<size_t> birth_list;                    ///< Holds org ids that can give birth. <org_wid>
+  std::set<size_t> eater_list;                    ///< Holds org ids that have eaten a resource <org_wid>
+  std::map<size_t, size_t> eaten_list;            ///< Variable that holds resources that have been eaten along with organims world-id. <res_id, org_id>
+  std::queue<event_t> events;                     ///< Queue to hold all events that happen in the world. <(size_t) trait, wid/mid>
+  enum class Trait {CONSUME, KILLED, BIRTH};        ///< Different kind of events
 
 public:  
   BeakerWorld(BeakerWorldConfig & _config)
@@ -87,7 +93,16 @@ public:
     Config_All();
   }
 
-  ~BeakerWorld() { id_map.clear(); random_ptr.Delete();}
+  ~BeakerWorld() 
+  { 
+    id_map.clear(); 
+    resources.clear();
+    kill_list.clear();
+    birth_list.clear();
+    eaten_list.clear();
+    while(!events.empty()) {events.pop();}
+    random_ptr.Delete();
+  }
 
   surface_t & GetSurface() { return surface; }
 
@@ -127,12 +142,15 @@ public:
   void Col_Birth(size_t h);               ///< Will keep track of organisms in the system
   void Col_Death(size_t h);               ///< Will keep track of organisms in the system
 
+  void Print_Lists();                     ///< Will print all the lists we have
+  void Print_Queue(std::queue<event_t> copy_queue);                     ///< Will print Events queue
+
   /* Functions dedicated to the physics of the system */
 
-  bool PairCollision(BeakerOrg & body1, BeakerOrg & body2) ///< Function dedicated to dealing with organims collisions [TODO]
-  {    
-    return true;
-  }
+  bool PairCollision(BeakerOrg & body1, BeakerOrg & body2) {return true;} ///< Function dedicated to dealing with organims collisions [TODO]
+
+  void ProcessEvents();  ///< Process all the events in order!
+
 
   /* Functions dedicated for experiment functionality */
   double MutRad(double r, BeakerOrg & org);
@@ -194,6 +212,11 @@ void BeakerWorld::Config_World() ///< Function dedicated to configuring the worl
   // Trigger for an organisms death.
   OnOrgDeath( [this](size_t pos) 
   {
+    // Remove id from these lists 
+    birth_list.erase(pos);
+    eater_list.erase(pos);
+    kill_list.erase(pos);
+
     // Keep track of org deaths and remove from id_map and surface!
     Col_Death((size_t) GetOrg(pos).GetBrain().GetTrait(HEAT));
     surface.RemoveBody(GetOrg(pos).GetSurfaceID());
@@ -314,8 +337,10 @@ void BeakerWorld::Config_Surf() ///< Function dedicated to configuring the surfa
 
       if(kill_list.find(prey_id) == kill_list.end())
       {
+        std::cerr << "ORG EATEN!" << std::endl;
         pred.AddEnergy(prey.GetEnergy() / 2.0);
         kill_list.insert(prey_id);
+        events.push(std::make_pair((size_t)Trait::KILLED, prey_id));
         death_eat++;
         redraw = true;
       }
@@ -324,14 +349,20 @@ void BeakerWorld::Config_Surf() ///< Function dedicated to configuring the surfa
   //< Overlap function for organism to eat a resource
   surface.AddOverlapFun( [this](BeakerOrg & org, BeakerResource & res) 
   {
+    // IDs to locate organims
     const size_t org_wid = org.GetBrain().GetTrait((size_t)BeakerOrg::Trait::WRL_ID);
     const size_t res_mid = res.GetMapID();
+    // Minimum radius size to consume resource
+    double thresh = ((config.MAX_RAD_VAL()-config.MIN_RAD_VAL()) * config.CONSUME_RES_THRESH()) + config.MIN_RAD_VAL();;
+    const double org_rd = surface.GetRadius(org.GetSurfaceID());
 
-    // If the resource has not been eaten yet?
-    if(eaten_list.find(res_mid) == eaten_list.end())
+    // If the resource has not been eaten yet and the size requirement is met?
+    if(eaten_list.find(res_mid) == eaten_list.end() && org_rd <= thresh)
     {
       // We store the resource id and the organism world_id that ate it. 
       eaten_list[res_mid] = org_wid;
+      eater_list.insert(org_wid);
+      events.push(std::make_pair((size_t)Trait::CONSUME, res_mid)); 
     }
   });
   surface.AddOverlapFun( [](BeakerResource &, BeakerResource &) 
@@ -349,8 +380,10 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
   // On each update, run organisms and make sure they stay on the surface.
   OnUpdate([this](size_t)
   {
+    // std::cerr << "START UP" << std::endl;
     // Process all organisms.
     Process(config.PROCESS_NUM());
+    // std::cerr << "PASS PROCESS" << std::endl;
 
     // Update each organism.
     for (size_t pos = 0; pos < pop.size(); pos++) 
@@ -367,6 +400,7 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
       if (org.GetEnergy() > config.REPRODUCTION_THRESH()) 
       {
         birth_list.insert(pos);
+        events.push(std::make_pair((size_t)Trait::BIRTH, pos));
         redraw = true;
       }
       // If an organism starves to death, store id.
@@ -374,67 +408,91 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
       {
         death_stv++;
         kill_list.insert(pos);
+        events.push(std::make_pair((size_t)Trait::KILLED, pos));
         redraw = true;
       }
     }
 
-    ///< w_id -> world id
-    ///< map_id -> map_id id in BeakerWorld
+    // std::cerr << "PASS FOR" << std::endl;
+    ProcessEvents();
+    // std::cerr << "FINISH UP" << std::endl;
+    // std::cerr << "********************************************\n" << std::endl;
+  });
+}
 
-    // Kill all organims that need to be killed 
-    for(auto w_id : kill_list)
+void BeakerWorld::ProcessEvents()
+{
+  // Print_Lists();
+  // std::cerr << "PROCESS EVENTS" << std::endl;
+  while(!events.empty())
+  {
+    size_t event = (size_t) events.front().first;
+    size_t or_wid = (size_t) events.front().second;
+
+    // Death Events (Eaten/Starved)
+    if(event == (size_t) Trait::KILLED)
     {
-      DoDeath(w_id);
+      // std::cerr << "START DEATH" << std::endl;
+      DoDeath(or_wid);
+      // std::cerr << "END DEATH" << std::endl;
     }
 
-    // Allow organisms to eat
-    for(auto & p : eaten_list)
+    // If consume resource event
+    else if(event == (size_t) Trait::CONSUME)
     {
-      // If organism was not killed allow to consume resource
-      // and relocate resource randomly. 
-      if(kill_list.find(p.second) == kill_list.end())
+      // std::cerr << "START CONSUME" << std::endl;
+      size_t org_id = eaten_list[or_wid];
+      // If organism is still able to eat
+      if(eater_list.find(org_id) != eater_list.end())
       {
-        auto & org = *pop[p.second];
+        auto & org = *pop[eaten_list[or_wid]];
         org.AddEnergy(config.RESOURCE_POWERUP());
         double x = random_ptr->GetDouble(config.WORLD_X());
         double y = random_ptr->GetDouble(config.WORLD_Y());
-        surface.SetCenter(resources[p.first].GetSurfaceID(), {x,y});
+        surface.SetCenter(resources[or_wid].GetSurfaceID(), {x,y});
       }
+      // std::cerr << "END CONSUME" << std::endl;      
     }
-
-    // Allow organisms to reproduce
-    for(auto w_id : birth_list)
+    // If birth event
+    else if(event == (size_t) Trait::BIRTH)
     {
-      // If world is full skip loop
-      if(GetNumOrgs() == config.MAX_POP_SIZE())
+      // std::cerr << "START BIRTH" << std::endl;
+      // Check if we can add new org to pop.
+      if(GetNumOrgs() < config.MAX_POP_SIZE())
       {
-        break;
-      }
-      // Else if the org has been killed, cannot reproduce and skip
-      else if(kill_list.find(w_id) != kill_list.end())
-      {
-        continue;
-      }
-      // Else all conditions are met for an org to reproduce
-      else
-      {
-        size_t map_id = GetOrg(w_id).GetBrain().GetTrait((size_t)BeakerOrg::Trait::MAP_ID);
-        // If org id is still active
-        if(id_map.find(map_id) != id_map.end())
+        // If org is still in the birth_list
+        if(birth_list.find(or_wid) != birth_list.end())
         {
           // Split energy for building offspring by half and spawn new organism.
-          emp::Ptr<BeakerOrg> org = id_map[map_id];
-          org->SubEnergy(org->GetEnergy() / config.REPRODUCTION_PENALTY());
-          DoBirth(GetOrg(w_id), w_id);
+          auto & org = GetOrg(or_wid);
+          // std::cerr << "ENERGY: " << org.GetEnergy() << std::endl;
+          org.SubEnergy(org.GetEnergy() / config.REPRODUCTION_PENALTY());
+          DoBirth(GetOrg(or_wid), or_wid);
+          birth_list.erase(org.GetBrain().GetTrait((size_t)BeakerOrg::Trait::WRL_ID));
         }
       }
+      // std::cerr << "END BIRTH" << std::endl;
+    }
+    // Error
+    else
+    {
+      std::cerr << "EVENT-ID NOT FOUND" << std::endl;
+      exit(-1);
     }
 
-    // Clear list for next update call
-    birth_list.clear();
-    kill_list.clear();
-    eaten_list.clear();
-  });
+    events.pop();
+  }
+
+  // std::cerr << std::endl;
+  // Print_Lists();
+
+  // Clear list for next update call
+  birth_list.clear();
+  kill_list.clear();
+  eater_list.clear();
+  eaten_list.clear();
+
+  // std::cerr << "FINISH PROCESS" << std::endl;
 }
 
 void BeakerWorld::Initial_Inject() ///< Function dedicated to injection the initial population or organisms and resources
@@ -448,7 +506,7 @@ void BeakerWorld::Initial_Inject() ///< Function dedicated to injection the init
     double y = random_ptr->GetDouble(config.WORLD_Y());
     
     // Get random radius and calculate heat color
-    double rad = random_ptr->GetDouble(config.PROGRAM_MIN_RAD_VAL(), config.PROGRAM_MAX_RAD_VAL());
+    double rad = random_ptr->GetDouble(config.MIN_RAD_VAL(), config.MAX_RAD_VAL());
     size_t heat = Calc_Heat(rad);
     Col_Birth(heat);
 
@@ -479,12 +537,12 @@ void BeakerWorld::Initial_Inject() ///< Function dedicated to injection the init
 
 size_t BeakerWorld::Calc_Heat(double r) ///< Function dedicated to injection the initial population or organisms and resources
 {
-  double diff = config.PROGRAM_MAX_RAD_VAL() - config.PROGRAM_MIN_RAD_VAL();
+  double diff = config.MAX_RAD_VAL() - config.MIN_RAD_VAL();
   diff = diff / (double) hm_size;
   size_t pos = 0;
-  double curr = config.PROGRAM_MIN_RAD_VAL();
+  double curr = config.MIN_RAD_VAL();
 
-  while(curr <= config.PROGRAM_MAX_RAD_VAL())
+  while(curr <= config.MAX_RAD_VAL())
   {
     curr += diff;
     if(r <= curr )
@@ -566,6 +624,50 @@ void BeakerWorld::Col_Death(size_t h)
   std::cout << "Col_Death Not Found: " << h << std::endl;
 }
 
+void BeakerWorld::Print_Lists()
+{
+  std::cerr << "Kill_List: ";
+  for (const size_t id : kill_list)
+  {
+    std::cerr << id << ", ";
+  }
+  std::cerr << std::endl;
+
+  std::cerr << "Birth_List: ";
+  for (const size_t id : birth_list)
+  {
+    std::cerr << id << ", ";
+  }
+  std::cerr << std::endl;
+
+  std::cerr << "Eater_List: ";
+  for (const size_t id : eater_list)
+  {
+    std::cerr << id << ", ";
+  }
+  std::cerr << std::endl;
+
+  std::cerr << "Eaten_List: ";
+  for (auto id : eaten_list)
+  {
+    std::cerr << "(" << id.first << ", " << id.second << "), ";
+  }
+  std::cerr << std::endl;
+
+  std::cerr << "Events: ";
+  Print_Queue(events);
+}
+
+void BeakerWorld::Print_Queue(std::queue<event_t> copy_queue)
+{
+  while (!copy_queue.empty())
+  {
+    std::cerr << "(" << copy_queue.front().first << ", " << copy_queue.front().second << "), ";
+    copy_queue.pop();
+  }
+  std::cerr << std::endl;
+}
+
 /* Functions dedicated to experiment functionality */
 
 double BeakerWorld::MutRad(double r, BeakerOrg & org)
@@ -576,14 +678,17 @@ double BeakerWorld::MutRad(double r, BeakerOrg & org)
       double diff = random_ptr->GetRandNormal(0, .5);
       double new_r = radius + diff;
 
-      if(new_r > config.PROGRAM_MAX_RAD_VAL())
+      if(new_r > config.MAX_RAD_VAL())
       {
-        new_r = config.PROGRAM_MAX_RAD_VAL();
+        new_r = config.MAX_RAD_VAL();
       }
-      if(new_r < config.PROGRAM_MIN_RAD_VAL())
+      if(new_r < config.MIN_RAD_VAL())
       {
-        new_r = config.PROGRAM_MIN_RAD_VAL();
+        new_r = config.MIN_RAD_VAL();
       }
+
+      std::cerr << "(" << r << ")RADMUT(" << new_r << ")" << std::endl; 
+
       return new_r;
     }
     return r;
