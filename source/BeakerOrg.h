@@ -27,6 +27,7 @@ private:
   hardware_t brain;                 ///< Underlying represet
   emp::Angle facing;                ///< Direction the organism if facing!
   double energy;                    ///< Amount of energy the organims has
+  size_t heat;                      ///< Stores heat of the organism
 
 public:
   BeakerOrg(inst_lib_t & inst_lib, event_lib_t & event_lib, emp::Ptr<emp::Random> random_ptr)
@@ -49,6 +50,8 @@ public:
   const hardware_t & GetBrain() const { return brain; }
   emp::Angle GetFacing() const { return facing; }
   double GetEnergy() const { return energy; }
+  size_t GetHeat() const { return heat; }
+
 
   ///< Set the ID of the organism!
   BeakerOrg & SetID(size_t _in) { id = _in; return *this; }
@@ -58,12 +61,20 @@ public:
   BeakerOrg & SetFacing(emp::Angle _in) { facing = _in; return *this; }
   ///< Set the energy variable!
   BeakerOrg & SetEnergy(double _in) { energy = _in; return *this; }
-  ///< Add Energy to the organism and return this organism!
-  BeakerOrg & AddEnergy(double _in) { energy += _in; return *this;}
+  ///< Set the organism's heat
+  BeakerOrg & SetHeat(size_t h) { heat = h; return *this; }
+
+
   ///< Subtract Energy to the organism and return this organism!
   BeakerOrg & SubEnergy(double _in) { energy -= _in; return *this;}
   ///< Rotate the direction that organism is facing!
   BeakerOrg & RotateDegrees(double degrees) { facing.RotateDegrees(degrees); return *this; }
+  ///< Add Energy to the organism and return this organism!
+  BeakerOrg & AddEnergy(double _in, double cap) 
+  {
+    (energy + _in > cap) ? energy = cap : energy += _in;
+    return *this;
+  }
 
   void Setup(emp::WorldPosition pos, emp::Random & random) 
   {
@@ -74,6 +85,16 @@ public:
   {
     brain.Process(exe_count);
   };
+
+  double GetTrait(size_t pos)
+  {
+    return brain.GetTrait(pos);
+  }
+
+  void SetTrait(size_t id, double val)
+  {
+    brain.SetTrait(id, val);
+  }
 };
 
 #endif
