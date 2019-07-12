@@ -3,6 +3,7 @@
 
 // Standard includes
 #include <iostream>
+#include <iomanip>
 
 // Empirical includes
 #include "web/Animate.h"
@@ -76,6 +77,44 @@ class WebInterface : public UI::Animate
                 [this]()
                 {
                     return world.GetStv() + world.GetEat() + world.GetPop();
+                }
+            )
+            << "<br>" 
+            
+            << "Avg Blue Rad: " << UI::Live(
+                [this]()
+                {
+                    return world.GetAvgBlue();
+                }
+            )
+             << " | Avg Cyan Rad: " << UI::Live(
+                [this]()
+                {
+                    return world.GetAvgCyan();
+                }
+            )
+             << " | Avg Lime Rad: " << UI::Live(
+                [this]()
+                {
+                    return world.GetAvgLime();
+                }
+            )
+             << " | Avg Yellow Rad: " << UI::Live(
+                [this]()
+                {
+                    return world.GetAvgYellow();
+                }
+            )
+             << " | Avg Red Rad: " << UI::Live(
+                [this]()
+                {
+                    return world.GetAvgRed();
+                }
+            )
+             << " | Avg White Rad: " << UI::Live(
+                [this]()
+                {
+                    return world.GetAvgWhite();
                 }
             )
             << "<br>";
