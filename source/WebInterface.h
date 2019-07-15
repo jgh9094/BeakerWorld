@@ -80,38 +80,39 @@ class WebInterface : public UI::Animate
                 }
             )
             << "<br>" 
-            
-            << "Avg Blue Rad: " << UI::Live(
+            << "<u>Average Radius</u>:"
+            << "<br>" 
+            << "Blue: " << UI::Live(
                 [this]()
                 {
                     return world.GetAvgBlue();
                 }
             )
-             << " | Avg Cyan Rad: " << UI::Live(
+             << " | Cyan: " << UI::Live(
                 [this]()
                 {
                     return world.GetAvgCyan();
                 }
             )
-             << " | Avg Lime Rad: " << UI::Live(
+             << " | Lime: " << UI::Live(
                 [this]()
                 {
                     return world.GetAvgLime();
                 }
             )
-             << " | Avg Yellow Rad: " << UI::Live(
+             << " | Yellow: " << UI::Live(
                 [this]()
                 {
                     return world.GetAvgYellow();
                 }
             )
-             << " | Avg Red Rad: " << UI::Live(
+             << " | Red: " << UI::Live(
                 [this]()
                 {
                     return world.GetAvgRed();
                 }
             )
-             << " | Avg White Rad: " << UI::Live(
+             << " | White: " << UI::Live(
                 [this]()
                 {
                     return world.GetAvgWhite();
