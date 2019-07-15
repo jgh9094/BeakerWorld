@@ -1,5 +1,4 @@
 /// This is the world for BeakerOrgs
-
 #ifndef BEAKER_WORLD_H
 #define BEAKER_WORLD_H
 
@@ -118,31 +117,32 @@ class BeakerWorld : public emp::World<BeakerOrg>
 
     /* Functions dedicated to the initilization of the run! */
 
-    void Config_All();
-    void Config_World();           ///< Function dedicated to configuring the world
-    void Config_Mut();             ///< Function dedicated to configuring the mutation operator
-    void Config_Inst();            ///< Function dedicated to configuring the instructions and instrucion library
-    void Config_Surf();            ///< Function dedicated to configuring the surface
-    void Config_OnUp();            ///< Function dedicated to configuring the OnUpdate function
-    void Initial_Inject();         ///< Function dedicated to injection the initial population or organisms and resources
-    size_t Calc_Heat(double r);    ///< Function dedicated to finding what heat an organism should get
+    void Config_All();             ///< Function will run all Config_* functions!
+    void Config_World();           ///< Function will configure the world
+    void Config_Mut();             ///< Function will configure the mutation operator
+    void Config_Inst();            ///< Function will configure the instructions and instrucion library
+    void Config_Surf();            ///< Function will configure the surface
+    void Config_OnUp();            ///< Function will configure the OnUpdate function
+    void Initial_Inject();         ///< Function inject the initial population into the world
+    size_t Calc_Heat(double r);    ///< Function will calculate an orgs heat signature
 
     /* Getter and setter functions for statistics! */
 
-    int GetStv() {return death_stv;}       ///< Function dedicated to keeping track of world deaths
+    int GetStv() {return death_stv;}            ///< Function dedicated to keeping track of world deaths
     int GetEat() {return death_eat;}
     int GetPop() {return death_pop;}
 
-    int GetBlue() {return blue_cnt;}       ///< Functions dedicated to returning population distributions
+    int GetBlue() {return blue_cnt;}            ///< Functions dedicated to returning population distributions
     int GetCyan() {return cyan_cnt;}
     int GetLime() {return lime_cnt;}
     int GetYellow() {return yellow_cnt;}
     int GetRed() {return red_cnt;}
     int GetWhite() {return white_cnt;}
 
-    size_t GetResSize() {return resources.size();} ///< Functions dedicated to returning container sizes
+    size_t GetResSize() {return resources.size();}              ///< Functions dedicated to returning container sizes
     size_t GetIDSize() {return id_map.size();}
-    bool GetRedraw() {return redraw;}
+
+    bool GetRedraw() {return redraw;}                           ///< Will return the variable to determine if we need to redraw
 
     std::string GetAvgBlue() {return Precision(avg_blue);}       ///< Functions dedicated to returning population distributions
     std::string GetAvgCyan() {return Precision(avg_cyan);}
@@ -155,33 +155,35 @@ class BeakerWorld : public emp::World<BeakerOrg>
 
 
     /* Functions dedicated to calculating statistics! */
-    
-    void Col_Birth(size_t h);               ///< Will keep track of organisms in the system
-    void Col_Death(size_t h);               ///< Will keep track of organisms in the system
-
+     
+    void Col_Birth(size_t h);                             ///< Will increment number of heat signatures
+    void Col_Death(size_t h);                             ///< Will decrement number of heat signatures
     void Sum_Rad(size_t h, double radius);                ///< Will calculate average radius per heat signature
     void Calc_Rad();                                      ///< Divide each sum of radii by the color count
     void Reset_Avg();                                     ///< Resets Average before every run
-    std::string Precision(double radius);
+    std::string Precision(double radius);                 ///< Will set double to 3 precision
 
-    void Print_Lists();                     ///< Will print all the lists we have
-    void Print_Queue(std::queue<event_t> copy_queue);                     ///< Will print Events queue
 
     /* Functions dedicated to the physics of the system */
 
-    bool PairCollision(BeakerOrg & body1, BeakerOrg & body2) {return true;} ///< Function dedicated to dealing with organims collisions [TODO]
-
-    void ProcessEvents();  ///< Process all the events in order!
+    bool PairCollision(BeakerOrg & body1, BeakerOrg & body2) {return true;}   ///< Function dedicated to dealing with organims collisions [TODO]
+    void ProcessEvents();                                                     ///< Process all the events in order!
 
 
     /* Functions dedicated for experiment functionality */
-    double MutRad(double r, BeakerOrg & org);
 
+    double MutRad(double r, BeakerOrg & org);                                 ///< Function will mutate radius, if possible
+
+    /* Functions dedicated to debugging the system */
+
+    void Print_Lists();                                                     ///< Will print all the lists we have
+    void Print_Queue(std::queue<event_t> copy_queue);                       ///< Will print Events queue
 };
+
 
 /* Functions dedicated to the initilization of the run */
 
-void BeakerWorld::Config_All()
+void BeakerWorld::Config_All()  ///< Function will run all Config_* functions!
 {
   Config_World();
   Config_Mut();
@@ -349,7 +351,7 @@ void BeakerWorld::Config_Surf() ///< Function dedicated to configuring the surfa
   {
     double pred_rd = surface.GetRadius(pred.GetSurfaceID());
     double prey_rd = surface.GetRadius(prey.GetSurfaceID());
-    double lower_b = pred_rd - (pred_rd * config.MIN_CONSUME_RATIO());
+    double lower_b = pred_rd * config.MIN_CONSUME_RATIO();
     double upper_b = pred_rd + (pred_rd * config.MAX_CONSUME_RATIO());
 
     // If prey radius is within pred radius bound
@@ -361,7 +363,7 @@ void BeakerWorld::Config_Surf() ///< Function dedicated to configuring the surfa
       if(kill_list.find(prey_id) == kill_list.end())
       {
         // std::cerr << "ORG EATEN!" << std::endl;
-        pred.AddEnergy(prey.GetEnergy() / 2.0, config.MAX_ENERGY_CAP());
+        pred.AddEnergy(prey.GetEnergy() / config.EAT_ORG_ENERGRY_PROP(), config.MAX_ENERGY_CAP());
         kill_list.insert(prey_id);
         events.push(std::make_pair((size_t)Trait::KILLED, prey_id));
         death_eat++;
@@ -408,6 +410,8 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
     Process(config.PROCESS_NUM());
     // std::cerr << "PASS PROCESS" << std::endl;
 
+    Reset_Avg();
+
     // Update each organism.
     for (size_t pos = 0; pos < pop.size(); pos++) 
     {
@@ -445,7 +449,10 @@ void BeakerWorld::Config_OnUp() ///< Function dedicated to configuring the OnUpd
   });
 }
 
-void BeakerWorld::Reset_Avg()
+
+/* Functions dedicated to calculating statistics! */
+
+void BeakerWorld::Reset_Avg()  ///< Resets Average before every run
 {
   avg_blue = 0.0;
   avg_cyan = 0.0;
@@ -455,7 +462,7 @@ void BeakerWorld::Reset_Avg()
   avg_white = 0.0;
 }
 
-void BeakerWorld::ProcessEvents()
+void BeakerWorld::ProcessEvents() ///< Process all the events in order!
 {
   // Print_Lists();
   // std::cerr << "PROCESS EVENTS" << std::endl;
@@ -591,7 +598,7 @@ size_t BeakerWorld::Calc_Heat(double r) ///< Function dedicated to injection the
   return hm_size - 1;
 }
 
-void BeakerWorld::Col_Birth(size_t h)
+void BeakerWorld::Col_Birth(size_t h)  ///< Will increment number of heat signatures
 {
   switch(h)
   {
@@ -622,7 +629,7 @@ void BeakerWorld::Col_Birth(size_t h)
   std::cout << "Col_Birth Not Found: " << h << std::endl;
 }
 
-void BeakerWorld::Col_Death(size_t h)
+void BeakerWorld::Col_Death(size_t h)  ///< Will decrement number of heat signatures
 {
   switch(h)
   {
@@ -653,7 +660,7 @@ void BeakerWorld::Col_Death(size_t h)
   std::cout << "Col_Death Not Found: " << h << std::endl;
 }
 
-void BeakerWorld::Sum_Rad(size_t h, double radius)
+void BeakerWorld::Sum_Rad(size_t h, double radius)  ///< Will calculate average radius per heat signature
 {
   switch(h)
   {
@@ -682,7 +689,8 @@ void BeakerWorld::Sum_Rad(size_t h, double radius)
       return;
   }
 }
-void BeakerWorld::Calc_Rad()
+
+void BeakerWorld::Calc_Rad()  ///< Divide each sum of radii by the color count
 {
   (blue_cnt == 0.0) ? avg_blue = 0.0 : avg_blue /= blue_cnt;
   (cyan_cnt == 0.0) ? avg_cyan = 0.0 : avg_cyan /= cyan_cnt;
@@ -692,15 +700,47 @@ void BeakerWorld::Calc_Rad()
   (white_cnt == 0.0) ? avg_white = 0.0 : avg_white /= white_cnt;
 }
 
-std::string BeakerWorld::Precision(double radius)
+std::string BeakerWorld::Precision(double radius)  ///< Will set double to 3 precision
 {
-  std::string rad = std::to_string(radius);
-  std::stringstream stream;
-  stream << std::fixed << std::setprecision(3) << rad;
-  return stream.str();
+  std::ostringstream os;
+  os << std::fixed;
+  os << std::setprecision(3);
+  os << radius;
+  std::string pre = os.str();
+  return pre;
 }
 
-void BeakerWorld::Print_Lists()
+
+/* Functions dedicated to experiment functionality */
+
+double BeakerWorld::MutRad(double r, BeakerOrg & org)  ///< Function will mutate radius, if possible
+{
+  if(random_ptr->P(config.RADIUS_MUT()))
+    {
+      double radius = surface.GetRadius(org.GetSurfaceID());
+      double diff = random_ptr->GetRandNormal(0, .3);
+      double new_r = radius + diff;
+
+      if(new_r > config.MAX_RAD_VAL())
+      {
+        new_r = config.MAX_RAD_VAL();
+      }
+      if(new_r < config.MIN_RAD_VAL())
+      {
+        new_r = config.MIN_RAD_VAL();
+      }
+
+      std::cerr << "(" << r << ")RADMUT(" << new_r << ")" << std::endl; 
+
+      return new_r;
+    }
+    return r;
+}
+
+
+/* Functions dedicated to debugging the system */
+
+void BeakerWorld::Print_Lists()   ///< Will print all the lists we have
 {
   std::cerr << "Kill_List: ";
   for (const size_t id : kill_list)
@@ -734,7 +774,7 @@ void BeakerWorld::Print_Lists()
   Print_Queue(events);
 }
 
-void BeakerWorld::Print_Queue(std::queue<event_t> copy_queue)
+void BeakerWorld::Print_Queue(std::queue<event_t> copy_queue)  ///< Will print Events queue
 {
   while (!copy_queue.empty())
   {
@@ -742,32 +782,6 @@ void BeakerWorld::Print_Queue(std::queue<event_t> copy_queue)
     copy_queue.pop();
   }
   std::cerr << std::endl;
-}
-
-/* Functions dedicated to experiment functionality */
-
-double BeakerWorld::MutRad(double r, BeakerOrg & org)
-{
-  if(random_ptr->P(config.RADIUS_MUT()))
-    {
-      double radius = surface.GetRadius(org.GetSurfaceID());
-      double diff = random_ptr->GetRandNormal(0, .5);
-      double new_r = radius + diff;
-
-      if(new_r > config.MAX_RAD_VAL())
-      {
-        new_r = config.MAX_RAD_VAL();
-      }
-      if(new_r < config.MIN_RAD_VAL())
-      {
-        new_r = config.MIN_RAD_VAL();
-      }
-
-      std::cerr << "(" << r << ")RADMUT(" << new_r << ")" << std::endl; 
-
-      return new_r;
-    }
-    return r;
 }
 
 #endif
