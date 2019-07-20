@@ -14,20 +14,24 @@ public:
   static constexpr double HW_MIN_SIM_THRESH = 0.0; // Min similarity threshold for match. 
 
   using hardware_t = emp::EventDrivenGP_AW<TAG_WIDTH>;
+  using program_t = hardware_t::program_t;
   using event_lib_t = hardware_t::event_lib_t;
   using inst_t = hardware_t::inst_t;
   using inst_lib_t = hardware_t::inst_lib_t;
   using hw_state_t = hardware_t::State;
 
-  enum class Trait { MAP_ID, WRL_ID };
+  enum class Trait {HEAT_ID, MAP_ID, WRL_ID};
 
-private:
+public:
   size_t id;                        ///< Organism personal ID
   size_t surface_id;                ///< Organism surface ID
+  size_t map_id;                    ///< Oraganism map id
+  size_t wrl_id;                    ///< 
+
   hardware_t brain;                 ///< Underlying represet
   emp::Angle facing;                ///< Direction the organism if facing!
   double energy;                    ///< Amount of energy the organims has
-  size_t heat;                      ///< Stores heat of the organism
+  size_t heat_id;                      ///< Stores heat_id of the organism
 
 public:
   BeakerOrg(inst_lib_t & inst_lib, event_lib_t & event_lib, emp::Ptr<emp::Random> random_ptr)
@@ -38,6 +42,8 @@ public:
     brain.SetMaxCallDepth(HW_MAX_CALL_DEPTH);  
   }
   BeakerOrg(const BeakerOrg &) = default;
+
+
   BeakerOrg(BeakerOrg &&) = default;
   ~BeakerOrg() { ; }
 
@@ -45,24 +51,31 @@ public:
   BeakerOrg & operator=(BeakerOrg &&) = default;
 
   size_t GetID() const { return id; }
-  size_t GetSurfaceID() const { return surface_id; }
+  size_t GetSurfaceID() { return surface_id; }
+  size_t GetWorldID() { return wrl_id; }
+  size_t GetMapID() {return map_id;}
   hardware_t & GetBrain() { return brain; }
   const hardware_t & GetBrain() const { return brain; }
   emp::Angle GetFacing() const { return facing; }
   double GetEnergy() const { return energy; }
-  size_t GetHeat() const { return heat; }
+  size_t GetHeat() const { return heat_id; }
 
 
   ///< Set the ID of the organism!
   BeakerOrg & SetID(size_t _in) { id = _in; return *this; }
   ///< Set the Surface ID 
   BeakerOrg & SetSurfaceID(size_t _in) { surface_id = _in; return *this; }
+  ///< Set the World ID 
+  BeakerOrg & SetWorldID(size_t _in) { wrl_id = _in; return *this; }
+  ///< Set the Map ID 
+  BeakerOrg & SetMapID(size_t _in) { map_id = _in; return *this; }
+  ///< Set the World ID 
+  BeakerOrg & SetHeatID(size_t _in) { heat_id = _in; return *this; }
   ///< Set the direction the organims is facing!
   BeakerOrg & SetFacing(emp::Angle _in) { facing = _in; return *this; }
   ///< Set the energy variable!
   BeakerOrg & SetEnergy(double _in) { energy = _in; return *this; }
-  ///< Set the organism's heat
-  BeakerOrg & SetHeat(size_t h) { heat = h; return *this; }
+
 
 
   ///< Subtract Energy to the organism and return this organism!
@@ -94,6 +107,16 @@ public:
   void SetTrait(size_t id, double val)
   {
     brain.SetTrait(id, val);
+  }
+
+  void Load(std::istream & input)
+  {
+    brain.Load(input);
+  }
+
+  void PushInst(const std::string & name)
+  {
+    brain.PushInst(name);
   }
 };
 
