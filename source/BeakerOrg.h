@@ -26,7 +26,8 @@ public:
   size_t id;                        ///< Organism personal ID
   size_t surface_id;                ///< Organism surface ID
   size_t map_id;                    ///< Oraganism map id
-  size_t wrl_id;                    ///< 
+  size_t wrl_id;                    ///< Organism world id
+  double radius;                     ///< Organism radius
 
   hardware_t brain;                 ///< Underlying represet
   emp::Angle facing;                ///< Direction the organism if facing!
@@ -53,12 +54,13 @@ public:
   size_t GetID() const { return id; }
   size_t GetSurfaceID() { return surface_id; }
   size_t GetWorldID() { return wrl_id; }
+  size_t GetRadius() { return radius; }
   size_t GetMapID() {return map_id;}
   hardware_t & GetBrain() { return brain; }
   const hardware_t & GetBrain() const { return brain; }
   emp::Angle GetFacing() const { return facing; }
   double GetEnergy() const { return energy; }
-  size_t GetHeat() const { return heat_id; }
+  size_t GetHeatID() const { return heat_id; }
 
 
   ///< Set the ID of the organism!
@@ -67,6 +69,8 @@ public:
   BeakerOrg & SetSurfaceID(size_t _in) { surface_id = _in; return *this; }
   ///< Set the World ID 
   BeakerOrg & SetWorldID(size_t _in) { wrl_id = _in; return *this; }
+  ///< Set the radius
+  BeakerOrg & SetRadius(double _in) { radius = _in; return *this;}
   ///< Set the Map ID 
   BeakerOrg & SetMapID(size_t _in) { map_id = _in; return *this; }
   ///< Set the World ID 
