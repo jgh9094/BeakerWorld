@@ -13,6 +13,7 @@
 #include "config.h"
 #include "BeakerResource.h"
 #include "BeakerOrg.h"
+#include "ResourceManager.h"
 
 ///< Standard C++ includes
 #include <queue>
@@ -47,7 +48,7 @@ class BeakerWorld : public emp::World<BeakerOrg>
 
     /* Configuration specific variables */
 
-    BeakerWorldConfig & config;                               ///< Stores all experiment configurations
+    BeakerConfig & config;                               ///< Stores all experiment configurations
     std::unordered_map<size_t, emp::Ptr<BeakerOrg>> id_map;   ///< Stores all surface and org world ids
     emp::vector<BeakerResource> resources;                    ///< Stores all surface resources
     int next_id;                                              ///< Stores the id placement for id_map
@@ -104,7 +105,7 @@ class BeakerWorld : public emp::World<BeakerOrg>
 
   public:  
 
-    BeakerWorld(BeakerWorldConfig & _config)
+    BeakerWorld(BeakerConfig & _config)
       : config(_config), id_map(), next_id(0), 
         hm_size(config.HM_SIZE()), inst_lib(), event_lib(), 
         signalgp_mutator(), surface({config.WORLD_X(), config.WORLD_Y()})
@@ -380,7 +381,6 @@ void BeakerWorld::ConfigSurface() ///< Function dedicated to configure the surfa
         const size_t prey_sid = prey.GetSurfaceID();
         // Get org world id
         const size_t prey_wid = prey.GetWorldID();
-        const size_t pred_wid = pred.GetWorldID();
         // Use surface id to get radius
         const double pred_rd = surface.GetRadius(pred_sid);
         const double prey_rd = surface.GetRadius(prey_sid);
@@ -486,7 +486,7 @@ void BeakerWorld::ConfigOnUp() ///< Function dedicated to configuring the OnUpda
 void BeakerWorld::InitialInject() ///< Function dedicated to injection the initial population or organisms and resources
 {
     // Add in resources.
-    resources.resize(config.NUM_RESOURCE_SOURCES());
+    resources.resize(config.NUMBER_RESOURCES());
     for(size_t i = 0; i < resources.size(); ++i)
     {
         //Place them randomly throughout the canvas and store their map_id
