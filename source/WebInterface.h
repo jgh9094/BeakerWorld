@@ -79,6 +79,13 @@ class WebInterface : public UI::Animate
                     return world.GetStv() + world.GetEat() + world.GetPop();
                 }
             )
+            << " | NextID: "
+            << UI::Live(
+                [this]()
+                {
+                    return world.GetNextID();
+                }
+            )
             << "<br>" 
             << "<u>Average Radius</u>:"
             << "<br>" 
