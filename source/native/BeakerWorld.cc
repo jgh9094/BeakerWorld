@@ -20,9 +20,11 @@ int main(int argc, char* argv[])
   if (args.ProcessConfigOptions(config, std::cout, "BeakerWorld.cfg", "BeakerWorld-macros.h") == false) exit(0);
   if (args.TestUnknown() == false) exit(0);  // If there are leftover args, throw an error.
 
-  std::cout << "Begining Resource Manager" << std::endl;
-  ResourceManager rm(config);
-  rm.PrintSectors();
-  std::cout << "Finished Resource Manager" << std::endl;
+  std::cout << "Begining Run" << std::endl;
+  for(size_t i = 0; i < config.MAX_UPS(); ++i)
+  {
+    std::cout << "i=" << i << std::endl;
+  }
+  std::cout << "Finished Run" << std::endl;
 
 }

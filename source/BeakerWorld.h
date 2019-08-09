@@ -48,9 +48,9 @@ class BeakerWorld : public emp::World<BeakerOrg>
 
     /* Configuration specific variables */
 
-    BeakerConfig & config;                               ///< Stores all experiment configurations
+    BeakerConfig & config;                                    ///< Stores all experiment configurations
     std::unordered_map<size_t, emp::Ptr<BeakerOrg>> id_map;   ///< Stores all surface and org world ids
-    emp::vector<BeakerResource> resources;                    ///< Stores all surface resources
+    ResourceManager r_manager;                                  ///< Manages all surface resources
     int next_id;                                              ///< Stores the id placement for id_map
     size_t hm_size;                                           ///< Stores the size of the heat map
     emp::vector<size_t> scheduler;                            ///< Stores the order organisms are able to go
@@ -106,7 +106,7 @@ class BeakerWorld : public emp::World<BeakerOrg>
   public:  
 
     BeakerWorld(BeakerConfig & _config)
-      : config(_config), id_map(), next_id(0), 
+      : config(_config), id_map(), r_manager(_config), next_id(0), 
         hm_size(config.HM_SIZE()), inst_lib(), event_lib(), 
         signalgp_mutator(), surface({config.WORLD_X(), config.WORLD_Y()})
     {
@@ -118,7 +118,6 @@ class BeakerWorld : public emp::World<BeakerOrg>
     { 
       Clear();
       id_map.clear();  
-      resources.clear();
       kill_list.clear();
       birth_list.clear();
       eaten_list.clear();
@@ -152,7 +151,7 @@ class BeakerWorld : public emp::World<BeakerOrg>
     int GetRed() {return red_cnt;}
     int GetWhite() {return white_cnt;}
 
-    size_t GetResSize() {return resources.size();}               ///< Functions dedicated to returning container sizes
+    size_t GetResSize() {return config.NUMBER_RESOURCES();}               ///< Functions dedicated to returning container sizes
     size_t GetIDSize() {return id_map.size();}
     size_t GetNextID() {return next_id;}
 
@@ -486,15 +485,17 @@ void BeakerWorld::ConfigOnUp() ///< Function dedicated to configuring the OnUpda
 void BeakerWorld::InitialInject() ///< Function dedicated to injection the initial population or organisms and resources
 {
     // Add in resources.
-    resources.resize(config.NUMBER_RESOURCES());
-    for(size_t i = 0; i < resources.size(); ++i)
+    for(size_t i = 0; i < config.NUMBER_RESOURCES(); ++i)
     {
         //Place them randomly throughout the canvas and store their map_id
         double x = random_ptr->GetDouble(config.WORLD_X());
         double y = random_ptr->GetDouble(config.WORLD_Y());
-        resources[i].SetMapID(i);
-        resources[i].SetSurfaceID(surface.AddBody(&resources[i], {x,y}, 3.0, config.HM_SIZE()));
+        r_manager.SetMapID(i,i);
+        size_t sid = surface.AddBody(&r_manager.GetRes(i), {x,y}, 3.0, config.HM_SIZE());
+        r_manager.SetSurfaceID(i, sid);
     }
+
+    r_manager.PrintManager();
 
     // Initialize a populaton of random organisms.
     Inject(BeakerOrg(inst_lib, event_lib, random_ptr), 1);
@@ -586,7 +587,7 @@ void BeakerWorld::ProcessEvents() ///< Process all the events in order!
         org.AddEnergy(config.RESOURCE_POWERUP(), config.MAX_ENERGY_CAP());
         double x = random_ptr->GetDouble(config.WORLD_X());
         double y = random_ptr->GetDouble(config.WORLD_Y());
-        surface.SetCenter(resources[id].GetSurfaceID(), {x,y});
+        surface.SetCenter(r_manager.GetSurfaceID(id), {x,y});
         eater_list.erase(org_wid);
         eaten_list.erase(id);
       }

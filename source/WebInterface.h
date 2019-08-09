@@ -20,7 +20,7 @@ namespace UI = emp::web;
 
 class WebInterface : public UI::Animate
 {
-    BeakerWorldConfig config;               ///< Configurations we are uploading.
+    BeakerConfig config;               ///< Configurations we are uploading.
     UI::Document control_viewer;            ///< Object in charge of the controls.
     UI::Document beaker_viewer;             ///< Object in charge of beaker view.
     UI::Document stats_viewer;              ///< Object in charge of stats view.
